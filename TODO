@@ -115,16 +115,27 @@ Example Response:
 }
 ```
 
-### 3. Person Management Endpoint
+### 3. Create Person Endpoint
 
-POST /api/person
+POST /api/person/create
 
-- Creates/updates person information
+- Creates a new person record
+- Requires only name and phone number
+- Other fields (interests, skills, bio, location) are optional
 - Automatically generates and stores vector embeddings
 - Validates phone number format
-- Updates existing record if phone number exists
+- Returns 409 Conflict if phone number already exists
 
-Example Request:
+Example Minimal Request:
+
+```json
+{
+  "phoneNumber": "+14155552671",
+  "name": "John Doe"
+}
+```
+
+Example Full Request:
 
 ```json
 {
@@ -137,7 +148,26 @@ Example Request:
 }
 ```
 
-Example Response (Create):
+Example Response (Minimal Request):
+
+```json
+{
+  "success": true,
+  "message": "Person created successfully",
+  "data": {
+    "phoneNumber": "+14155552671",
+    "name": "John Doe",
+    "interests": [],
+    "skills": [],
+    "bio": "",
+    "location": "",
+    "createdAt": "2024-03-15T08:30:00Z",
+    "updatedAt": "2024-03-15T08:30:00Z"
+  }
+}
+```
+
+Example Response (Full Request):
 
 ```json
 {
@@ -156,24 +186,85 @@ Example Response (Create):
 }
 ```
 
-Example Response (Update):
+Error Responses:
+
+```json
+{
+  "success": false,
+  "error": "Invalid phone number format",
+  "code": 400
+}
+```
+
+```json
+{
+  "success": false,
+  "error": "Phone number already exists",
+  "code": 409
+}
+```
+
+```json
+{
+  "success": false,
+  "error": "Name is required",
+  "code": 400
+}
+```
+
+### 4. Update Person Endpoint
+
+PUT /api/person/{phoneNumber}
+
+- Updates an existing person's information
+- Automatically updates vector embeddings
+- Returns 404 if person not found
+
+Example Request:
+
+```json
+{
+  "name": "John Doe",
+  "interests": ["hiking", "photography", "machine learning", "cooking"],
+  "skills": ["JavaScript", "Python", "public speaking", "React"],
+  "bio": "Software engineer passionate about outdoor activities and cooking",
+  "location": "San Francisco, CA"
+}
+```
+
+Example Response:
 
 ```json
 {
   "success": true,
   "message": "Person updated successfully",
   "data": {
-    // Same structure as create response
+    "phoneNumber": "+14155552671",
+    "name": "John Doe",
+    "interests": ["hiking", "photography", "machine learning", "cooking"],
+    "skills": ["JavaScript", "Python", "public speaking", "React"],
+    "bio": "Software engineer passionate about outdoor activities and cooking",
+    "location": "San Francisco, CA",
+    "createdAt": "2024-03-15T08:30:00Z",
+    "updatedAt": "2024-03-15T09:45:00Z"
   }
 }
 ```
 
-Error Response:
+Error Responses:
 
 ```json
 {
   "success": false,
-  "error": "Invalid phone number format",
+  "error": "Person not found",
+  "code": 404
+}
+```
+
+```json
+{
+  "success": false,
+  "error": "Invalid request data",
   "code": 400
 }
 ```
