@@ -1,0 +1,91 @@
+# Phone-based People Connector System
+
+## Database Schema (MongoDB)
+
+### Person Document Structure
+
+```javascript
+{
+  _id: ObjectId,
+  phoneNumber: String,
+  name: String,
+  interests: [String],
+  skills: [String],
+  bio: String,
+  location: String,
+  vectorEmbedding: [Float], // Store embeddings for semantic search
+  createdAt: Date,
+  updatedAt: Date
+}
+```
+
+## API Endpoints
+
+### 1. Person Information Endpoint
+
+GET /api/person/{phoneNumber}
+
+- Retrieves person's information from MongoDB using phone number
+- Returns 404 if person not found
+- Used by Vapi to fetch caller information
+
+### 2. Similar Person Search Endpoint
+
+POST /api/person/similar
+
+- Input: Interests/skills/description text
+- Generates embedding for input text
+- Performs vector similarity search in MongoDB
+- Returns most similar people based on cosine similarity
+- Used by Vapi when someone asks for connections
+
+### 3. Person Management Endpoint
+
+POST /api/person
+
+- Creates/updates person information
+- Automatically generates and stores vector embeddings
+- Validates phone number format
+- Updates existing record if phone number exists
+
+## Implementation Tasks
+
+### Database Setup
+
+- [ ] Set up MongoDB Atlas cluster
+- [ ] Create indexes for phoneNumber and vector search
+- [ ] Implement vector search capabilities
+
+### API Development
+
+- [ ] Set up Python Flask backend
+- [ ] Implement SBERT embeddings generation
+- [ ] Create CRUD operations for person management
+- [ ] Add vector similarity search functionality
+- [ ] Add input validation and error handling
+
+### Vapi Integration
+
+- [ ] Set up Vapi account and phone number
+- [ ] Create Vapi assistant with appropriate prompts
+- [ ] Configure webhook endpoints for Vapi
+- [ ] Implement function calling for database operations
+- [ ] Add conversation flows for:
+  - New user registration
+  - Finding similar people
+  - Updating user information
+
+### Security
+
+- [ ] Add API authentication
+- [ ] Implement rate limiting
+- [ ] Add phone number verification
+- [ ] Secure MongoDB connection
+- [ ] Add input sanitization
+
+### Testing
+
+- [ ] Write unit tests for API endpoints
+- [ ] Test vector similarity search accuracy
+- [ ] Test Vapi integration
+- [ ] Load testing for concurrent calls
