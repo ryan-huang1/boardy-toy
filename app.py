@@ -1,9 +1,15 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from database import MongoDB
+from embeddings import EmbeddingGenerator
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
+
+# Initialize SBERT model at server start
+print("Initializing SBERT model...")
+EmbeddingGenerator.initialize()
+print("SBERT model initialization complete!")
 
 # Register person routes
 from routes.person import person_bp

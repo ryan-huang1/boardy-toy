@@ -58,7 +58,7 @@ def create_person():
         skills = data.get('skills', [])
         
         # Generate embedding for interests and skills
-        embedding_generator = EmbeddingGenerator()
+        embedding_generator = EmbeddingGenerator.get_instance()
         vector_embedding = embedding_generator.generate_combined_embedding(interests, skills)
             
         # Prepare person document
@@ -120,11 +120,22 @@ def list_persons():
         # Get paginated results
         cursor = db.persons.find({}).skip(skip).limit(per_page)
         
-        # Convert cursor to list and remove _id from each document
+        # Convert cursor to list and process each document
         persons = []
         for person in cursor:
+            # Get the first 5 dimensions of the embedding vector if it exists
+            embedding_preview = None
+            if person.get('vectorEmbedding') and len(person['vectorEmbedding']) > 0:
+                embedding_preview = person['vectorEmbedding'][:5]
+            
+            # Remove full embedding from response
+            person.pop('vectorEmbedding', None)
             person.pop('_id', None)
-            person.pop('vectorEmbedding', None)  # Remove vector embedding from response
+            
+            # Add embedding preview if available
+            if embedding_preview is not None:
+                person['embeddingPreview'] = embedding_preview
+            
             persons.append(person)
             
         return jsonify({
