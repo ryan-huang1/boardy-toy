@@ -135,4 +135,28 @@ def list_persons():
             'success': False,
             'error': str(e),
             'code': 500
+        }), 500
+
+@person_bp.route('/delete-all', methods=['DELETE'])
+def delete_all_persons():
+    try:
+        # Get database instance
+        db = MongoDB().get_db()
+        
+        # Delete all documents from persons collection
+        result = db.persons.delete_many({})
+        
+        return jsonify({
+            'success': True,
+            'message': f'Successfully deleted {result.deleted_count} persons',
+            'data': {
+                'deleted_count': result.deleted_count
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'code': 500
         }), 500 
