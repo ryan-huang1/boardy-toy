@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify, request
 from database import MongoDB
 from datetime import datetime
+from embeddings import EmbeddingGenerator
 import re
 
 # Create blueprint
@@ -52,16 +53,24 @@ def create_person():
                 'code': 409
             }), 409
             
+        # Get interests and skills
+        interests = data.get('interests', [])
+        skills = data.get('skills', [])
+        
+        # Generate embedding for interests and skills
+        embedding_generator = EmbeddingGenerator()
+        vector_embedding = embedding_generator.generate_combined_embedding(interests, skills)
+            
         # Prepare person document
         now = datetime.utcnow()
         person = {
             'phoneNumber': data['phoneNumber'],
             'name': data['name'],
-            'interests': data.get('interests', []),
-            'skills': data.get('skills', []),
+            'interests': interests,
+            'skills': skills,
             'bio': data.get('bio', ''),
             'location': data.get('location', ''),
-            'vectorEmbedding': [],  # TODO: Implement embedding generation
+            'vectorEmbedding': vector_embedding,
             'createdAt': now,
             'updatedAt': now
         }
@@ -69,8 +78,9 @@ def create_person():
         # Insert person into database
         result = db.persons.insert_one(person)
         
-        # Remove _id from response
+        # Remove _id and vectorEmbedding from response
         person.pop('_id', None)
+        person.pop('vectorEmbedding', None)
         
         return jsonify({
             'success': True,
