@@ -159,4 +159,37 @@ def delete_all_persons():
             'success': False,
             'error': str(e),
             'code': 500
+        }), 500
+
+@person_bp.route('/<phone_number>', methods=['GET'])
+def get_person(phone_number):
+    try:
+        # Get database instance
+        db = MongoDB().get_db()
+        
+        # Find person by phone number
+        person = db.persons.find_one({'phoneNumber': phone_number})
+        
+        # Return 404 if person not found
+        if not person:
+            return jsonify({
+                'success': False,
+                'error': 'Person not found',
+                'code': 404
+            }), 404
+            
+        # Remove MongoDB _id and vector embedding from response
+        person.pop('_id', None)
+        person.pop('vectorEmbedding', None)
+        
+        return jsonify({
+            'success': True,
+            'data': person
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'code': 500
         }), 500 
