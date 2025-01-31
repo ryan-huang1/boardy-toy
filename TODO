@@ -29,6 +29,40 @@ GET /api/person/{phoneNumber}
 - Returns 404 if person not found
 - Used by Vapi to fetch caller information
 
+Example Request:
+
+```
+GET /api/person/+14155552671
+```
+
+Example Response:
+
+```json
+{
+  "success": true,
+  "data": {
+    "phoneNumber": "+14155552671",
+    "name": "John Doe",
+    "interests": ["hiking", "photography", "machine learning"],
+    "skills": ["JavaScript", "Python", "public speaking"],
+    "bio": "Software engineer passionate about outdoor activities",
+    "location": "San Francisco, CA",
+    "createdAt": "2024-03-15T08:30:00Z",
+    "updatedAt": "2024-03-15T08:30:00Z"
+  }
+}
+```
+
+Error Response:
+
+```json
+{
+  "success": false,
+  "error": "Person not found",
+  "code": 404
+}
+```
+
 ### 2. Similar Person Search Endpoint
 
 POST /api/person/similar
@@ -39,6 +73,48 @@ POST /api/person/similar
 - Returns most similar people based on cosine similarity
 - Used by Vapi when someone asks for connections
 
+Example Request:
+
+```json
+{
+  "searchText": "Looking for someone interested in hiking and photography who knows JavaScript",
+  "limit": 3
+}
+```
+
+Example Response:
+
+```json
+{
+  "success": true,
+  "data": {
+    "matches": [
+      {
+        "name": "John Doe",
+        "phoneNumber": "+14155552671",
+        "interests": ["hiking", "photography", "machine learning"],
+        "skills": ["JavaScript", "Python", "public speaking"],
+        "similarity": 0.89
+      },
+      {
+        "name": "Jane Smith",
+        "phoneNumber": "+14155553892",
+        "interests": ["photography", "travel", "coding"],
+        "skills": ["JavaScript", "React", "UI/UX"],
+        "similarity": 0.75
+      },
+      {
+        "name": "Mike Johnson",
+        "phoneNumber": "+14155559023",
+        "interests": ["hiking", "camping", "web development"],
+        "skills": ["JavaScript", "Node.js", "MongoDB"],
+        "similarity": 0.72
+      }
+    ]
+  }
+}
+```
+
 ### 3. Person Management Endpoint
 
 POST /api/person
@@ -47,6 +123,60 @@ POST /api/person
 - Automatically generates and stores vector embeddings
 - Validates phone number format
 - Updates existing record if phone number exists
+
+Example Request:
+
+```json
+{
+  "phoneNumber": "+14155552671",
+  "name": "John Doe",
+  "interests": ["hiking", "photography", "machine learning"],
+  "skills": ["JavaScript", "Python", "public speaking"],
+  "bio": "Software engineer passionate about outdoor activities",
+  "location": "San Francisco, CA"
+}
+```
+
+Example Response (Create):
+
+```json
+{
+  "success": true,
+  "message": "Person created successfully",
+  "data": {
+    "phoneNumber": "+14155552671",
+    "name": "John Doe",
+    "interests": ["hiking", "photography", "machine learning"],
+    "skills": ["JavaScript", "Python", "public speaking"],
+    "bio": "Software engineer passionate about outdoor activities",
+    "location": "San Francisco, CA",
+    "createdAt": "2024-03-15T08:30:00Z",
+    "updatedAt": "2024-03-15T08:30:00Z"
+  }
+}
+```
+
+Example Response (Update):
+
+```json
+{
+  "success": true,
+  "message": "Person updated successfully",
+  "data": {
+    // Same structure as create response
+  }
+}
+```
+
+Error Response:
+
+```json
+{
+  "success": false,
+  "error": "Invalid phone number format",
+  "code": 400
+}
+```
 
 ## Implementation Tasks
 
