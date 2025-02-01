@@ -14,11 +14,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
+# Install CPU-only PyTorch first
+RUN pip3 install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+
 # Copy requirements first to leverage Docker cache
 COPY requirements.txt .
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+# Remove torch from requirements since we installed it separately
+RUN grep -v "torch" requirements.txt > requirements_no_torch.txt && \
+    pip install --no-cache-dir -r requirements_no_torch.txt
 
 # Copy the rest of the application
 COPY . .
