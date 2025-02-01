@@ -373,14 +373,27 @@ def find_similar_people():
         print(f"Remote Address: {request.remote_addr}")
         print("===================================\n")
 
-        # Get query from URL parameters
+        # Get and validate query parameter
         query_text = request.args.get('query')
+        
+        # Validate query is present and is a string
+        if not isinstance(query_text, str):
+            return jsonify({
+                'success': False,
+                'error': 'Query must be a string',
+                'code': 400
+            }), 400
+            
+        # Validate query is not empty after stripping whitespace
+        query_text = query_text.strip()
         if not query_text:
             return jsonify({
                 'success': False,
-                'error': 'Query parameter is required (e.g. /similar?query=your search text)',
+                'error': 'Query cannot be empty',
                 'code': 400
             }), 400
+            
+        print(f"Processing search query: '{query_text}'")
             
         # Get database instance
         db = MongoDB().get_db()
