@@ -213,4 +213,128 @@ def get_person(phone_number):
             'success': False,
             'error': str(e),
             'code': 500
+        }), 500
+
+@person_bp.route('/<phone_number>', methods=['PUT'])
+def update_person(phone_number):
+    try:
+        # Get database instance
+        db = MongoDB().get_db()
+        
+        # Find person by phone number
+        person = db.persons.find_one({'phoneNumber': phone_number})
+        
+        # Return 404 if person not found
+        if not person:
+            return jsonify({
+                'success': False,
+                'error': 'Person not found',
+                'code': 404
+            }), 404
+        
+        # Get request data
+        data = request.get_json()
+        if not data:
+            return jsonify({
+                'success': False,
+                'error': 'Invalid request data',
+                'code': 400
+            }), 400
+            
+        def normalize_strings(items):
+            """Normalize strings by converting to lowercase and stripping whitespace"""
+            return [str(item).lower().strip() for item in items]
+            
+        def remove_duplicates(items):
+            """Remove duplicates while preserving original case of first occurrence"""
+            seen = {}  # lowercase -> original case
+            for item in items:
+                norm = str(item).lower().strip()
+                if norm not in seen:
+                    seen[norm] = item
+            return list(seen.values())
+            
+        # Update fields if provided in request
+        update_data = {}
+        interests_updated = False
+        skills_updated = False
+        bio_updated = False
+        
+        if 'name' in data:
+            update_data['name'] = data['name']
+        if 'interests' in data:
+            # Normalize and combine interests
+            current_interests = normalize_strings(person.get('interests', []))
+            new_interests = normalize_strings(data['interests'])
+            # Use sets for efficient union operation
+            combined_normalized = set(current_interests).union(new_interests)
+            # Get original case versions
+            all_interests = person.get('interests', []) + data['interests']
+            update_data['interests'] = remove_duplicates(all_interests)
+            interests_updated = True
+        if 'skills' in data:
+            # Normalize and combine skills
+            current_skills = normalize_strings(person.get('skills', []))
+            new_skills = normalize_strings(data['skills'])
+            # Use sets for efficient union operation
+            combined_normalized = set(current_skills).union(new_skills)
+            # Get original case versions
+            all_skills = person.get('skills', []) + data['skills']
+            update_data['skills'] = remove_duplicates(all_skills)
+            skills_updated = True
+        if 'bio' in data:
+            update_data['bio'] = data['bio']
+            bio_updated = True
+        if 'location' in data:
+            update_data['location'] = data['location']
+            
+        # Update vector embedding if interests, skills, or bio changed
+        if interests_updated or skills_updated or bio_updated:
+            # Get current or updated values
+            interests = update_data.get('interests', person.get('interests', []))
+            skills = update_data.get('skills', person.get('skills', []))
+            bio = update_data.get('bio', person.get('bio', ''))
+            
+            # Generate new embedding
+            embedding_generator = EmbeddingGenerator.get_instance()
+            update_data['vectorEmbedding'] = embedding_generator.generate_combined_embedding(
+                interests=interests,
+                skills=skills,
+                bio=bio
+            )
+            
+        # Update timestamp
+        update_data['updatedAt'] = datetime.utcnow()
+        
+        # Update person in database
+        result = db.persons.update_one(
+            {'phoneNumber': phone_number},
+            {'$set': update_data}
+        )
+        
+        if result.modified_count == 0:
+            return jsonify({
+                'success': False,
+                'error': 'No changes made to person',
+                'code': 400
+            }), 400
+            
+        # Get updated person
+        updated_person = db.persons.find_one({'phoneNumber': phone_number})
+        
+        # Remove _id and vectorEmbedding from response
+        updated_person.pop('_id', None)
+        updated_person.pop('vectorEmbedding', None)
+        
+        return jsonify({
+            'success': True,
+            'message': 'Person updated successfully',
+            'data': updated_person
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'code': 500
         }), 500 

@@ -32,16 +32,19 @@ class EmbeddingGenerator:
         embedding = self._model.encode(text, convert_to_tensor=False)
         return embedding.tolist()
 
-    def generate_combined_embedding(self, interests, skills):
-        """Generate a combined embedding from interests and skills"""
-        # Combine interests and skills into a single descriptive text
+    def generate_combined_embedding(self, interests, skills, bio=None):
+        """Generate a combined embedding from interests, skills, and bio"""
+        # Combine interests, skills, and bio into a single descriptive text
         combined_text = ""
         
         if interests:
             combined_text += "Interests: " + ", ".join(interests) + ". "
         
         if skills:
-            combined_text += "Skills: " + ", ".join(skills)
+            combined_text += "Skills: " + ", ".join(skills) + ". "
+            
+        if bio:
+            combined_text += "Bio: " + bio
             
         if not combined_text:
             return []
