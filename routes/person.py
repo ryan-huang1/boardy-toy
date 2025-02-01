@@ -3,6 +3,7 @@ from database import MongoDB
 from datetime import datetime
 from embeddings import EmbeddingGenerator
 import re
+import numpy as np
 
 # Create blueprint
 person_bp = Blueprint('person', __name__)
@@ -330,6 +331,109 @@ def update_person(phone_number):
             'success': True,
             'message': 'Person updated successfully',
             'data': updated_person
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'code': 500
+        }), 500
+
+@person_bp.route('/similar', methods=['POST'])
+def find_similar_people():
+    try:
+        # Get request data
+        data = request.get_json()
+        if not data or 'phoneNumber' not in data:
+            return jsonify({
+                'success': False,
+                'error': 'Phone number is required',
+                'code': 400
+            }), 400
+            
+        phone_number = data['phoneNumber']
+        initial_limit = 5  # Number of candidates for initial retrieval
+        
+        # Get database instance
+        db = MongoDB().get_db()
+        
+        # Find the person to match
+        person = db.persons.find_one({'phoneNumber': phone_number})
+        if not person:
+            return jsonify({
+                'success': False,
+                'error': 'Person not found',
+                'code': 404
+            }), 404
+            
+        # Get person's embedding
+        query_embedding = person.get('vectorEmbedding')
+        if not query_embedding:
+            return jsonify({
+                'success': False,
+                'error': 'Person has no embedding',
+                'code': 400
+            }), 400
+            
+        # Create query text for cross-encoder
+        query_text = ""
+        if person.get('interests'):
+            query_text += "Interests: " + ", ".join(person['interests']) + ". "
+        if person.get('skills'):
+            query_text += "Skills: " + ", ".join(person['skills']) + ". "
+        if person.get('bio'):
+            query_text += "Bio: " + person['bio']
+        
+        # Get all candidates except the query person
+        candidates = list(db.persons.find({
+            'phoneNumber': {'$ne': phone_number},
+            'vectorEmbedding': {'$exists': True, '$ne': None}
+        }))
+        
+        # Calculate cosine similarity for each candidate
+        results = []
+        query_norm = np.linalg.norm(query_embedding)
+        
+        for candidate in candidates:
+            candidate_embedding = candidate['vectorEmbedding']
+            candidate_norm = np.linalg.norm(candidate_embedding)
+            
+            # Calculate cosine similarity
+            similarity = np.dot(query_embedding, candidate_embedding) / (query_norm * candidate_norm)
+            
+            if similarity > 0:
+                results.append({
+                    'phoneNumber': candidate['phoneNumber'],
+                    'name': candidate['name'],
+                    'interests': candidate.get('interests', []),
+                    'skills': candidate.get('skills', []),
+                    'bio': candidate.get('bio', ''),
+                    'location': candidate.get('location', ''),
+                    'similarity': float(similarity)
+                })
+        
+        # Sort by similarity and get top k
+        results.sort(key=lambda x: x['similarity'], reverse=True)
+        initial_results = results[:initial_limit]
+        
+        if not initial_results:
+            return jsonify({
+                'success': True,
+                'data': {
+                    'matches': []
+                }
+            })
+            
+        # Second stage: Rerank using cross-encoder
+        embedding_generator = EmbeddingGenerator.get_instance()
+        reranked_results = embedding_generator.rerank_results(query_text, initial_results)
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'matches': reranked_results
+            }
         })
         
     except Exception as e:

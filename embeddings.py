@@ -1,17 +1,22 @@
-from sentence_transformers import SentenceTransformer
+from sentence_transformers import SentenceTransformer, CrossEncoder
 import numpy as np
 
 class EmbeddingGenerator:
     _instance = None
     _model = None
+    _cross_encoder = None
 
     @classmethod
     def initialize(cls):
-        """Initialize the SBERT model at server start"""
+        """Initialize the SBERT model and cross-encoder at server start"""
         if cls._model is None:
             print("Loading SBERT model...")
             cls._model = SentenceTransformer('all-MiniLM-L6-v2')
             print("SBERT model loaded successfully!")
+            
+            print("Loading cross-encoder model...")
+            cls._cross_encoder = CrossEncoder('cross-encoder/ms-marco-MiniLM-L-6-v2')
+            print("Cross-encoder model loaded successfully!")
         return cls._instance
 
     @classmethod
@@ -49,4 +54,37 @@ class EmbeddingGenerator:
         if not combined_text:
             return []
             
-        return self.generate_embedding(combined_text) 
+        return self.generate_embedding(combined_text)
+        
+    def rerank_results(self, query_text, candidates):
+        """Rerank candidates using cross-encoder"""
+        if not candidates:
+            return []
+            
+        # Prepare pairs for cross-encoder
+        pairs = []
+        for candidate in candidates:
+            # Create descriptive text for candidate
+            candidate_text = ""
+            if candidate.get('interests'):
+                candidate_text += "Interests: " + ", ".join(candidate['interests']) + ". "
+            if candidate.get('skills'):
+                candidate_text += "Skills: " + ", ".join(candidate['skills']) + ". "
+            if candidate.get('bio'):
+                candidate_text += "Bio: " + candidate['bio']
+            
+            pairs.append([query_text, candidate_text])
+            
+        # Get cross-encoder scores
+        scores = self._cross_encoder.predict(pairs)
+        
+        # Add scores to candidates
+        scored_candidates = []
+        for candidate, score in zip(candidates, scores):
+            if score > 0:  # Only include positive scores
+                candidate['similarity'] = float(score)
+                scored_candidates.append(candidate)
+                
+        # Sort by score descending
+        scored_candidates.sort(key=lambda x: x['similarity'], reverse=True)
+        return scored_candidates 
