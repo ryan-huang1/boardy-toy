@@ -365,6 +365,14 @@ def update_person():
 @person_bp.route('/similar', methods=['GET'])
 def find_similar_people():
     try:
+        # Print request information
+        print("\n=== Similar People Search Request ===")
+        print(f"Time: {datetime.utcnow()}")
+        print(f"Query Parameters: {dict(request.args)}")
+        print(f"Headers: {dict(request.headers)}")
+        print(f"Remote Address: {request.remote_addr}")
+        print("===================================\n")
+
         # Get query from URL parameters
         query_text = request.args.get('query')
         if not query_text:
