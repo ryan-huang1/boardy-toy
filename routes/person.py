@@ -374,8 +374,6 @@ def find_similar_people():
                 'code': 400
             }), 400
             
-        initial_limit = 5  # Number of candidates for initial retrieval
-        
         # Get database instance
         db = MongoDB().get_db()
         
@@ -417,25 +415,30 @@ def find_similar_people():
                     'similarity': float(similarity)
                 })
         
-        # Sort by similarity and get top k
+        # Sort by similarity and get only the best match
         results.sort(key=lambda x: x['similarity'], reverse=True)
-        initial_results = results[:initial_limit]
         
-        if not initial_results:
+        if not results:
             return jsonify({
                 'success': True,
-                'data': {
-                    'matches': []
-                }
+                'best_match': None,
+                'found': False
             })
             
-        # Second stage: Rerank using cross-encoder
-        reranked_results = embedding_generator.rerank_results(query_text, initial_results)
+        best_match = results[0]
         
+        # Format response for easy extraction by Bland AI
         return jsonify({
             'success': True,
-            'data': {
-                'matches': reranked_results
+            'found': True,
+            'best_match': {
+                'phone': best_match['phoneNumber'],  # Simplified key name
+                'name': best_match['name'],
+                'interests': ', '.join(best_match['interests']),  # Join lists for easier extraction
+                'skills': ', '.join(best_match['skills']),
+                'bio': best_match['bio'],
+                'location': best_match['location'],
+                'match_score': round(best_match['similarity'] * 100, 1)  # Convert to percentage
             }
         })
         
