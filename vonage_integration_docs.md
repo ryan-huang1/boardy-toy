@@ -4,7 +4,7 @@
 
 1. **Vonage Client Initialization:**
 
-   - The project uses the Vonage Python SDK to interact with Vonage’s Voice API.
+   - The project uses the Vonage Python SDK to interact with Vonage's Voice API.
    - The client is initialized using credentials loaded from environment variables (e.g., `VONAGE_APPLICATION_ID` and `API_KEY_PATH`). These credentials allow the app to authenticate and send voice call commands.
 
 2. **Initiating a Call (`/make-call` endpoint):**
@@ -18,7 +18,7 @@
    - When the call is answered by the recipient, Vonage makes a GET request to `/webhooks/answer`.
    - This endpoint returns an NCCO (Nexmo Call Control Object) in JSON format. The NCCO instructs Vonage on how to handle the call.
      - **Stream Action:**
-       - Plays a pre-generated audio message. This message is generated via a text-to-speech (TTS) process (using the ElevenLabs API in your project).
+       - Plays a pre-generated audio message.
        - The audio file is served via another endpoint (`/hello-audio/<filename>`).
      - **Input Action:**
        - Listens for user speech. The NCCO includes a speech input configuration that specifies details such as the language (`en-US`), sensitivity, and a reference to the `uuid` (passed along in the query parameters).
@@ -30,10 +30,8 @@
 4. **Handling Speech Input (`/webhooks/input` endpoint):**
 
    - When the user speaks, Vonage sends a POST request to `/webhooks/input` with the recognized speech data.
-   - The endpoint extracts the UUID (used to track the conversation) and the speech results.
-   - The speech result is stored in a local JSON-based chat history (using functions like `manage_chat_history`).
-   - The project then gets a response from an AI language model (using `get_groq_response`), which takes into account the conversation history.
-   - The response from the AI is converted into an audio file (using ElevenLabs TTS) and a new NCCO is constructed to stream this response back to the caller while also reinitiating the input action to continue the conversation.
+   - The endpoint extracts the UUID and the speech results.
+   - The endpoint processes the speech results and can respond with a new NCCO to continue the conversation.
 
 5. **Additional Webhook (`/webhooks/event`):**
    - This endpoint is used for receiving other events (such as call status updates) from Vonage. It currently logs the event data and responds with a simple acknowledgment.
@@ -45,7 +43,7 @@
 - **Voice Calls and NCCOs:**  
   Vonage Voice API uses NCCOs (Nexmo Call Control Objects) to control the flow of a call. An NCCO is a JSON array of actions that tells Vonage how to manage the call. Common actions include:
 
-  - **`talk`**: Convert text to speech using Vonage’s built-in TTS.
+  - **`talk`**: Convert text to speech using Vonage's built-in TTS.
   - **`stream`**: Play an audio file or stream to the call.
   - **`input`**: Capture user input (DTMF tones or speech) during the call.
   - **`record`**: Record the call.
@@ -54,7 +52,7 @@
 - **Call Lifecycle:**
   1. **Call Initiation:** Your server instructs Vonage to start a call.
   2. **Answer Webhook:** When the call is answered, Vonage requests the `answer_url` which should return an NCCO.
-  3. **Ongoing Interaction:** The NCCO directs the call’s behavior—playing audio, collecting input, etc.
+  3. **Ongoing Interaction:** The NCCO directs the call's behavior—playing audio, collecting input, etc.
   4. **Event Webhooks:** Vonage may send events (like call status changes) to an `event_url` to inform your application of updates.
 
 ## Summary
@@ -65,15 +63,15 @@ In this project, Vonage is used to:
   The `/make-call` endpoint creates a call from your server to a specified phone number.
 
 - **Control the Call Flow:**  
-  Once the call is answered, an NCCO (provided by the `/webhooks/answer` endpoint) instructs Vonage to play an audio message (using the stream action) and capture the caller’s speech (using the input action).
+  Once the call is answered, an NCCO (provided by the `/webhooks/answer` endpoint) instructs Vonage to play an audio message (using the stream action) and capture the caller's speech (using the input action).
 
-- **Process Conversational Input:**  
-  The `/webhooks/input` endpoint handles the incoming speech data, processes it (with chat history management and AI responses), and then returns a new NCCO to continue the interactive conversation.
+- **Process Speech Input:**  
+  The `/webhooks/input` endpoint handles the incoming speech data and returns a new NCCO to continue the conversation.
 
 - **Manage Events:**  
   The `/webhooks/event` endpoint logs additional call events for monitoring and debugging.
 
-This design leverages Vonage’s real-time voice capabilities to build an interactive, conversational voice application that combines AI-generated responses and TTS, seamlessly integrating several external services into one end-to-end solution.
+This design leverages Vonage's real-time voice capabilities to build an interactive voice application.
 
 ## Code Examples
 
@@ -155,17 +153,16 @@ def handle_input():
         highest_confidence_result = max(
             speech_results, key=lambda result: result.get('confidence', 0))
         user_text = highest_confidence_result.get('text', '')
-        manage_chat_history(uuid, user_text, "user")
     else:
         user_text = "Call ended"
-        manage_chat_history(uuid, user_text, "assistant")
 
-    # Get system response from the AI model
-    system_response = get_groq_response(get_chat_history(uuid))
-    manage_chat_history(uuid, system_response, "assistant")
+    # Generate your response text here
+    response_text = "Thank you for your message!"
 
-    audio_filename = generate_audio_file(system_response, AUDIO_FILE_PATH)
+    # Generate audio for the response
+    audio_filename = generate_audio_file(response_text, AUDIO_FILE_PATH)
     audio_url = f"{server_remote_url}hello-audio/{audio_filename}"
+
     response_ncco = [{
         'action': 'stream',
         "streamUrl": [audio_url],
