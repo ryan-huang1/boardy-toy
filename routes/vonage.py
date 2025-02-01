@@ -1,7 +1,7 @@
 from flask import Blueprint, Response, send_from_directory, request, jsonify
 import json
 import os
-import vonage
+from vonage import Vonage, Auth
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -22,9 +22,11 @@ API_KEY_PATH = os.getenv('API_KEY_PATH')
 VONAGE_NUMBER = os.getenv('VONAGE_NUMBER')
 
 # Vonage Client Setup
-client = vonage.Client(
-    application_id=VONAGE_APPLICATION_ID,
-    private_key=API_KEY_PATH,
+client = Vonage(
+    auth=Auth(
+        application_id=VONAGE_APPLICATION_ID,
+        private_key=API_KEY_PATH,
+    )
 )
 
 @vonage_bp.route('/intro-audio')
