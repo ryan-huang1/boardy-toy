@@ -8,6 +8,7 @@ load_dotenv()
 
 class MongoDB:
     _instance = None
+    _db = None  # Store the database instance
 
     def __new__(cls):
         if cls._instance is None:
@@ -23,8 +24,8 @@ class MongoDB:
             # Create MongoDB client
             self.client = MongoClient(uri)
             
-            # Get database
-            self.db = self.client[os.getenv('MONGO_DB')]
+            # Store database instance
+            self._db = self.client[os.getenv('MONGO_DB')]
             
             # Test connection
             self.client.admin.command('ping')
@@ -39,7 +40,7 @@ class MongoDB:
 
     def get_db(self):
         """Get the database instance"""
-        return self.db
+        return self._db
 
     def close_connection(self):
         """Close the MongoDB connection"""
