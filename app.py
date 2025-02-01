@@ -33,9 +33,12 @@ print("Initializing SBERT model...")
 EmbeddingGenerator.initialize()
 print("SBERT model initialization complete!")
 
-# Register person routes
+# Register blueprints
 from routes.person import person_bp
+from routes.vonage import vonage_bp
+
 app.register_blueprint(person_bp, url_prefix='/api/person')
+app.register_blueprint(vonage_bp, url_prefix='/api/vonage')
 
 @app.route('/health')
 def health_check():
