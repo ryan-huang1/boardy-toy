@@ -345,49 +345,32 @@ def find_similar_people():
     try:
         # Get request data
         data = request.get_json()
-        if not data or 'phoneNumber' not in data:
+        if not data or 'query' not in data:
             return jsonify({
                 'success': False,
-                'error': 'Phone number is required',
+                'error': 'Query string is required',
                 'code': 400
             }), 400
             
-        phone_number = data['phoneNumber']
+        query_text = data['query']
         initial_limit = 5  # Number of candidates for initial retrieval
         
         # Get database instance
         db = MongoDB().get_db()
         
-        # Find the person to match
-        person = db.persons.find_one({'phoneNumber': phone_number})
-        if not person:
-            return jsonify({
-                'success': False,
-                'error': 'Person not found',
-                'code': 404
-            }), 404
-            
-        # Get person's embedding
-        query_embedding = person.get('vectorEmbedding')
+        # Generate embedding for the query text
+        embedding_generator = EmbeddingGenerator.get_instance()
+        query_embedding = embedding_generator.generate_embedding(query_text)
+        
         if not query_embedding:
             return jsonify({
                 'success': False,
-                'error': 'Person has no embedding',
+                'error': 'Could not generate embedding for query',
                 'code': 400
             }), 400
             
-        # Create query text for cross-encoder
-        query_text = ""
-        if person.get('interests'):
-            query_text += "Interests: " + ", ".join(person['interests']) + ". "
-        if person.get('skills'):
-            query_text += "Skills: " + ", ".join(person['skills']) + ". "
-        if person.get('bio'):
-            query_text += "Bio: " + person['bio']
-        
-        # Get all candidates except the query person
+        # Get all candidates
         candidates = list(db.persons.find({
-            'phoneNumber': {'$ne': phone_number},
             'vectorEmbedding': {'$exists': True, '$ne': None}
         }))
         
@@ -426,7 +409,6 @@ def find_similar_people():
             })
             
         # Second stage: Rerank using cross-encoder
-        embedding_generator = EmbeddingGenerator.get_instance()
         reranked_results = embedding_generator.rerank_results(query_text, initial_results)
         
         return jsonify({
