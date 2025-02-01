@@ -183,9 +183,20 @@ def delete_all_persons():
             'code': 500
         }), 500
 
-@person_bp.route('/<phone_number>', methods=['GET'])
-def get_person(phone_number):
+@person_bp.route('', methods=['GET'])
+def get_person():
     try:
+        # Get phone number from query parameters
+        phone_number = request.args.get('phone_number')
+        
+        # Validate phone number is provided
+        if not phone_number:
+            return jsonify({
+                'success': False,
+                'error': 'Phone number is required as a query parameter',
+                'code': 400
+            }), 400
+            
         # Get database instance
         db = MongoDB().get_db()
         
@@ -216,9 +227,20 @@ def get_person(phone_number):
             'code': 500
         }), 500
 
-@person_bp.route('/<phone_number>', methods=['PUT'])
-def update_person(phone_number):
+@person_bp.route('', methods=['PUT'])
+def update_person():
     try:
+        # Get phone number from query parameters
+        phone_number = request.args.get('phone_number')
+        
+        # Validate phone number is provided
+        if not phone_number:
+            return jsonify({
+                'success': False,
+                'error': 'Phone number is required as a query parameter',
+                'code': 400
+            }), 400
+            
         # Get database instance
         db = MongoDB().get_db()
         
