@@ -8,4 +8,8 @@ transformers
 huggingface-hub
 sentence-transformers
 gunicorn
+elevenlabs
+groq
+pydub
+vonage
 # Exclude torch and torchvision as they are installed separately with CPU-only versions 
