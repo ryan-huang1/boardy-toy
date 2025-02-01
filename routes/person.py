@@ -362,19 +362,18 @@ def update_person():
             'code': 500
         }), 500
 
-@person_bp.route('/similar', methods=['POST'])
+@person_bp.route('/similar', methods=['GET'])
 def find_similar_people():
     try:
-        # Get request data
-        data = request.get_json()
-        if not data or 'query' not in data:
+        # Get query from URL parameters
+        query_text = request.args.get('query')
+        if not query_text:
             return jsonify({
                 'success': False,
-                'error': 'Query string is required',
+                'error': 'Query parameter is required (e.g. /similar?query=your search text)',
                 'code': 400
             }), 400
             
-        query_text = data['query']
         initial_limit = 5  # Number of candidates for initial retrieval
         
         # Get database instance
