@@ -104,13 +104,13 @@ def list_persons():
         
         # Get pagination parameters from query string
         page = int(request.args.get('page', 1))
-        per_page = int(request.args.get('per_page', 10))
+        per_page = int(request.args.get('per_page', 100))
         
         # Validate pagination parameters
         if page < 1:
             page = 1
         if per_page < 1 or per_page > 100:
-            per_page = 10
+            per_page = 100
             
         # Calculate skip value for pagination
         skip = (page - 1) * per_page
