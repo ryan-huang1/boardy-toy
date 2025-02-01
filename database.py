@@ -1,4 +1,5 @@
 import os
+import atexit
 from dotenv import load_dotenv
 from pymongo import MongoClient
 from pymongo.errors import ConnectionFailure
@@ -14,7 +15,15 @@ class MongoDB:
         if cls._instance is None:
             cls._instance = super(MongoDB, cls).__new__(cls)
             cls._instance._initialize_connection()
+            # Register cleanup on exit
+            atexit.register(cls._instance.cleanup)
         return cls._instance
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.cleanup()
 
     def _initialize_connection(self):
         try:
@@ -42,8 +51,15 @@ class MongoDB:
         """Get the database instance"""
         return self._db
 
-    def close_connection(self):
-        """Close the MongoDB connection"""
+    def cleanup(self):
+        """Cleanup resources"""
         if hasattr(self, 'client'):
-            self.client.close()
-            print("MongoDB connection closed.") 
+            try:
+                self.client.close()
+                print("MongoDB connection closed gracefully.")
+            except Exception as e:
+                print(f"Error while closing MongoDB connection: {e}")
+
+    def close_connection(self):
+        """Close the MongoDB connection (deprecated, use cleanup instead)"""
+        self.cleanup() 

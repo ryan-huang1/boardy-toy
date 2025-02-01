@@ -2,9 +2,23 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 from database import MongoDB
 from embeddings import EmbeddingGenerator
+import signal
+import sys
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
+
+def signal_handler(sig, frame):
+    """Handle shutdown signals gracefully"""
+    print('\nShutting down server gracefully...')
+    # Cleanup MongoDB connection
+    MongoDB().cleanup()
+    print('Server shutdown complete.')
+    sys.exit(0)
+
+# Register signal handlers
+signal.signal(signal.SIGINT, signal_handler)
+signal.signal(signal.SIGTERM, signal_handler)
 
 # Initialize SBERT model at server start
 print("Initializing SBERT model...")
@@ -36,4 +50,8 @@ def test_db():
         }), 500
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5001) 
+    try:
+        app.run(debug=True, host='0.0.0.0', port=5001)
+    finally:
+        # Ensure cleanup happens even if app.run() raises an exception
+        MongoDB().cleanup() 
