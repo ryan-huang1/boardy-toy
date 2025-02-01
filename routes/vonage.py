@@ -39,14 +39,30 @@ def handle_inbound_call():
     """Handle inbound calls from Vonage"""
     print("Received inbound call")
     
-    # Create NCCO to play intro.mp3
+    # Create NCCO with both stream and input actions
     ncco = [{
         'action': 'stream',
         'streamUrl': [f"{SERVER_URL}/api/vonage/intro-audio"],
         'bargeIn': True
+    }, {
+        'action': 'input',
+        'eventUrl': [f"{SERVER_URL}/api/vonage/webhooks/input"],
+        'type': ['speech'],
+        'speech': {
+            'uuid': [request.args.get('uuid')],
+            'endOnSilence': 1,
+            'sensitivity': '10',
+            'language': 'en-US'
+        }
     }]
     
     return Response(json.dumps(ncco), mimetype='application/json')
+
+@vonage_bp.route('/webhooks/input', methods=['POST'])
+def handle_input():
+    """Handle speech input from the call"""
+    print("Input received:", request.json)
+    return "OK", 200
 
 @vonage_bp.route('/webhooks/event', methods=['POST'])
 def handle_event():
