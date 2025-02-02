@@ -1,9 +1,10 @@
 from flask import Blueprint, jsonify, request
 from database import MongoDB
-from datetime import datetime
+from datetime import datetime, UTC
 from embeddings import EmbeddingGenerator
 import re
 import numpy as np
+import json
 
 # Create blueprint
 person_bp = Blueprint('person', __name__)
@@ -63,7 +64,7 @@ def create_person():
         vector_embedding = embedding_generator.generate_combined_embedding(interests, skills)
             
         # Prepare person document
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         person = {
             'phoneNumber': data['phoneNumber'],
             'name': data['name'],
@@ -347,7 +348,7 @@ def update_person():
             )
             
         # Update timestamp
-        update_data['updatedAt'] = datetime.utcnow()
+        update_data['updatedAt'] = datetime.now(UTC)
         
         # Update person in database
         result = db.persons.update_one(
@@ -385,19 +386,19 @@ def update_person():
 @person_bp.route('/similar', methods=['GET'])
 def find_similar_people():
     try:
-        # Print request information
-        print("\n=== Similar People Search Request ===")
-        print(f"Time: {datetime.utcnow()}")
-        print(f"Query Parameters: {dict(request.args)}")
-        print(f"Headers: {dict(request.headers)}")
-        print(f"Remote Address: {request.remote_addr}")
-        print("===================================\n")
+        timestamp = datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S')
+        print(f"\n[{timestamp}] === Similar People Search Request ===")
+        print(f"[{timestamp}] Query Parameters: {dict(request.args)}")
+        print(f"[{timestamp}] Headers: {dict(request.headers)}")
+        print(f"[{timestamp}] Remote Address: {request.remote_addr}")
+        print(f"[{timestamp}] ===================================\n")
 
         # Get and validate query parameter
         query_text = request.args.get('query')
         
         # Validate query is present and is a string
         if not isinstance(query_text, str):
+            print(f"[{timestamp}] Error: Query must be a string, got {type(query_text)}")
             return jsonify({
                 'success': False,
                 'error': 'Query must be a string',
@@ -407,13 +408,14 @@ def find_similar_people():
         # Validate query is not empty after stripping whitespace
         query_text = query_text.strip()
         if not query_text:
+            print(f"[{timestamp}] Error: Empty query after stripping whitespace")
             return jsonify({
                 'success': False,
                 'error': 'Query cannot be empty',
                 'code': 400
             }), 400
             
-        print(f"Processing search query: '{query_text}'")
+        print(f"[{timestamp}] Processing search query: '{query_text}'")
             
         # Get database instance
         db = MongoDB().get_db()
@@ -423,6 +425,7 @@ def find_similar_people():
         query_embedding = embedding_generator.generate_embedding(query_text)
         
         if not query_embedding:
+            print(f"[{timestamp}] Error: Could not generate embedding for query")
             return jsonify({
                 'success': False,
                 'error': 'Could not generate embedding for query',
@@ -433,6 +436,7 @@ def find_similar_people():
         candidates = list(db.persons.find({
             'vectorEmbedding': {'$exists': True, '$ne': None}
         }))
+        print(f"[{timestamp}] Found {len(candidates)} candidates with embeddings")
         
         # Calculate cosine similarity for each candidate
         results = []
@@ -456,10 +460,13 @@ def find_similar_people():
                     'similarity': float(similarity)
                 })
         
+        print(f"[{timestamp}] Found {len(results)} candidates with positive similarity")
+        
         # Sort by similarity and get only the best match
         results.sort(key=lambda x: x['similarity'], reverse=True)
         
         if not results:
+            print(f"[{timestamp}] No matches found")
             return jsonify({
                 'success': True,
                 'best_match': None,
@@ -467,9 +474,10 @@ def find_similar_people():
             })
             
         best_match = results[0]
+        print(f"[{timestamp}] Best match: {best_match['name']} with similarity {best_match['similarity']:.3f}")
         
         # Format response for easy extraction by Bland AI
-        return jsonify({
+        response = {
             'success': True,
             'found': True,
             'best_match': {
@@ -481,9 +489,13 @@ def find_similar_people():
                 'location': best_match['location'],
                 'match_score': round(best_match['similarity'] * 100, 1)  # Convert to percentage
             }
-        })
+        }
+        print(f"[{timestamp}] Returning response: {json.dumps(response, indent=2)}")
+        return jsonify(response)
         
     except Exception as e:
+        timestamp = datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S')
+        print(f"[{timestamp}] Error in find_similar_people: {str(e)}")
         return jsonify({
             'success': False,
             'error': str(e),

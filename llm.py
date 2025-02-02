@@ -1,7 +1,9 @@
 from groq import Groq
 import os
+import json
 import requests
 from typing import Generator, Optional
+from datetime import datetime, UTC
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -10,14 +12,20 @@ load_dotenv()
 # Server URL for API calls
 SERVER_URL = "https://dolphin-app-bsmq7.ondigitalocean.app"
 
+def log(message):
+    """Helper function for consistent logging"""
+    timestamp = datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S')
+    print(f"[{timestamp}] [LLM] {message}")
+
 class LLMGeneration:
     def __init__(self):
         """Initialize the LLM generation class with Groq client."""
         self.client = Groq(
             api_key=os.getenv('GROQ_API_KEY')
         )
-        self.model = "llama-3.1-8b-instant"  # Using tool-use model
-        
+        self.model = "llama3-groq-70b-8192-tool-use-preview"  # Using tool-use model
+        log(f"Initialized LLM with model: {self.model}")
+
     def get_system_prompt(self) -> str:
         """Return the system prompt for Boardy."""
         return """You are Boardy, a voice assistant to help people find like minded peers. 
@@ -80,6 +88,7 @@ You only have 1 task here, and it is to collect the user's background info, then
                 }
             }]
 
+            log("Generating LLM response...")
             completion = self.client.chat.completions.create(
                 model=self.model,
                 messages=messages,
@@ -98,31 +107,51 @@ You only have 1 task here, and it is to collect the user's background info, then
                 elif hasattr(chunk.choices[0].delta, 'tool_calls') and chunk.choices[0].delta.tool_calls:
                     tool_call = chunk.choices[0].delta.tool_calls[0]
                     if tool_call.function.name == "getSimilarPeople":
-                        # Call the similar people endpoint
+                        log("Processing getSimilarPeople tool call...")
                         try:
+                            # Parse the arguments as JSON
+                            args = json.loads(tool_call.function.arguments)
+                            query = args.get('query')
+                            
+                            if not query:
+                                log("Error: No query provided in tool call arguments")
+                                yield "I need more information about you before I can find similar people. Could you tell me more about your interests and skills?"
+                                continue
+                                
+                            log(f"Calling similar people endpoint with query: {query}")
                             response = requests.get(
                                 f"{SERVER_URL}/api/person/similar",
-                                params={"query": tool_call.function.arguments.get("query")}
+                                params={"query": query}
                             )
                             response.raise_for_status()
                             result = response.json()
                             
-                            if result.get('found'):
+                            log(f"Similar people endpoint response: {json.dumps(result, indent=2)}")
+                            
+                            if result.get('success') and result.get('found'):
                                 best_match = result['best_match']
                                 match_text = (
                                     f"Awesome it was nice to learn about you, I have a person in mind you might want to meet! {best_match['name']} is from {best_match['location']} "
                                     f"and is interested in {best_match['interests']}. They're skilled in {best_match['skills']}. "
                                     f"{best_match['bio']}"
                                 )
+                                log("Found a match, returning response")
                                 yield match_text
                             else:
+                                log("No matches found")
                                 yield "I couldn't find anyone similar at the moment, but we can try again later!"
-                        except Exception as e:
-                            print(f"Error calling similar people endpoint: {str(e)}")
+                        except json.JSONDecodeError as e:
+                            log(f"Error parsing tool call arguments: {str(e)}")
+                            yield "I encountered an error processing your information. Let's try again!"
+                        except requests.RequestException as e:
+                            log(f"Error calling similar people endpoint: {str(e)}")
                             yield "I encountered an error while searching for similar people. Let's try again on another call later!"
+                        except Exception as e:
+                            log(f"Unexpected error in tool call: {str(e)}")
+                            yield "Something unexpected happened. Let's try again later!"
                     
         except Exception as e:
-            print(f"Error generating response: {str(e)}")
+            log(f"Error generating response: {str(e)}")
             yield f"I apologize, but I encountered an error: {str(e)}"
 
     def start_conversation(self) -> Generator:
