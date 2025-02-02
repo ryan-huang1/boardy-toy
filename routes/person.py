@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request
 from database import MongoDB
-from datetime import datetime, UTC
+from datetime import datetime, timezone
 from embeddings import EmbeddingGenerator
 import re
 import numpy as np
@@ -64,7 +64,7 @@ def create_person():
         vector_embedding = embedding_generator.generate_combined_embedding(interests, skills)
             
         # Prepare person document
-        now = datetime.now(UTC)
+        now = datetime.now(timezone.utc)
         person = {
             'phoneNumber': data['phoneNumber'],
             'name': data['name'],
@@ -348,7 +348,7 @@ def update_person():
             )
             
         # Update timestamp
-        update_data['updatedAt'] = datetime.now(UTC)
+        update_data['updatedAt'] = datetime.now(timezone.utc)
         
         # Update person in database
         result = db.persons.update_one(
@@ -386,7 +386,7 @@ def update_person():
 @person_bp.route('/similar', methods=['GET'])
 def find_similar_people():
     try:
-        timestamp = datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S')
+        timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
         print(f"\n[{timestamp}] === Similar People Search Request ===")
         print(f"[{timestamp}] Query Parameters: {dict(request.args)}")
         print(f"[{timestamp}] Headers: {dict(request.headers)}")
@@ -494,7 +494,7 @@ def find_similar_people():
         return jsonify(response)
         
     except Exception as e:
-        timestamp = datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S')
+        timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
         print(f"[{timestamp}] Error in find_similar_people: {str(e)}")
         return jsonify({
             'success': False,

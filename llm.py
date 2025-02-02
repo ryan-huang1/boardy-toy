@@ -3,7 +3,7 @@ import os
 import json
 import requests
 from typing import Generator, Optional
-from datetime import datetime, UTC
+from datetime import datetime, timezone
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -14,7 +14,7 @@ SERVER_URL = "https://dolphin-app-bsmq7.ondigitalocean.app"
 
 def log(message):
     """Helper function for consistent logging"""
-    timestamp = datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S')
+    timestamp = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
     print(f"[{timestamp}] [LLM] {message}")
 
 class LLMGeneration:
