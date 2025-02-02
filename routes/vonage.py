@@ -112,6 +112,22 @@ def handle_input():
             speech_text = result.get('text', '')
             print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Speech text: {speech_text}")
 
+        # Skip LLM processing if speech text is empty or None
+        if not speech_text:
+            print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] No valid speech text received, sending retry NCCO")
+            ncco = [{
+                'action': 'input',
+                'eventUrl': [f"{SERVER_URL}/api/vonage/webhooks/input"],
+                'type': ['speech'],
+                'speech': {
+                    'uuid': [call_uuid],
+                    'endOnSilence': 1,
+                    'sensitivity': '30',
+                    'language': 'en-US'
+                }
+            }]
+            return Response(json.dumps(ncco), mimetype='application/json')
+
         # Clean up old audio files
         cleanup_old_audio_files()
 
