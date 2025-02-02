@@ -87,7 +87,7 @@ def handle_inbound_call():
         'speech': {
             'uuid': [call_uuid],
             'endOnSilence': 1,
-            'sensitivity': '10',
+            'sensitivity': '30',
             'language': 'en-US'
         }
     }]
@@ -159,7 +159,7 @@ def handle_input():
             'speech': {
                 'uuid': [call_uuid],
                 'endOnSilence': 1,
-                'sensitivity': '10',
+                'sensitivity': '30',
                 'language': 'en-US'
             }
         }]
