@@ -23,7 +23,7 @@ class LLMGeneration:
         self.client = Groq(
             api_key=os.getenv('GROQ_API_KEY')
         )
-        self.model = "llama3-groq-70b-8192-tool-use-preview"  # Using tool-use model
+        self.model = "llama-3.1-8b-instant"  # Using tool-use model
         log(f"Initialized LLM with model: {self.model}")
 
     def get_system_prompt(self) -> str:
