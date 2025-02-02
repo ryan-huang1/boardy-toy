@@ -35,7 +35,7 @@ You only have 1 task here, and it is to collect the user's background info, then
 
 - Be sure to be kind of funny and witty!
 - Keep all your responses short and simple. Use casual language, phrases like "Umm...", "Well...", and "I mean" are preferred.
-- This is a voice conversation, so keep your responses short, like in a real conversation. Don't ramble for too long."""
+- This is a voice conversation, so keep your responses short, like in a real conversation. 1 sentence is perfect. Don't ramble for too long."""
 
     def generate_response(self, 
                          messages: list, 
