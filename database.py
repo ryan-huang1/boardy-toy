@@ -3,6 +3,7 @@ import atexit
 from dotenv import load_dotenv
 from pymongo import MongoClient
 from pymongo.errors import ConnectionFailure
+from datetime import datetime
 
 # Load environment variables
 load_dotenv()
@@ -46,6 +47,53 @@ class MongoDB:
         except Exception as e:
             print(f"An error occurred: {e}")
             raise
+
+    def get_conversation_history(self, call_uuid):
+        """Get conversation history for a specific call"""
+        try:
+            conversation = self._db.conversations.find_one({'call_uuid': call_uuid})
+            return conversation['messages'] if conversation else []
+        except Exception as e:
+            print(f"Error getting conversation history: {e}")
+            return []
+
+    def update_conversation(self, call_uuid, user_message=None, assistant_message=None):
+        """Update conversation history with new messages"""
+        try:
+            # Get current timestamp
+            timestamp = datetime.utcnow()
+            
+            # Create update operations
+            update_ops = []
+            
+            if user_message:
+                update_ops.append({
+                    "role": "user",
+                    "content": user_message,
+                    "timestamp": timestamp
+                })
+                
+            if assistant_message:
+                update_ops.append({
+                    "role": "assistant",
+                    "content": assistant_message,
+                    "timestamp": timestamp
+                })
+                
+            if update_ops:
+                # Update or create conversation document
+                self._db.conversations.update_one(
+                    {'call_uuid': call_uuid},
+                    {
+                        '$push': {'messages': {'$each': update_ops}},
+                        '$setOnInsert': {'created_at': timestamp},
+                        '$set': {'updated_at': timestamp}
+                    },
+                    upsert=True
+                )
+                
+        except Exception as e:
+            print(f"Error updating conversation: {e}")
 
     def get_db(self):
         """Get the database instance"""
