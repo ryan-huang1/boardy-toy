@@ -41,7 +41,7 @@ class Voice:
         self._executor = ThreadPoolExecutor(max_workers=self.MAX_WORKERS)
 
     @lru_cache(maxsize=32)
-    def _get_cached_audio_segment(self, audio_bytes_hash):
+    def _get_cached_audio_segment(self, audio_bytes_hash, audio_bytes):
         """Cache processed AudioSegment objects to avoid redundant processing"""
         return AudioSegment.from_mp3(io.BytesIO(audio_bytes))
 
