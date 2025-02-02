@@ -147,17 +147,7 @@ You only have 1 task here, and it is to collect the user's background info, then
                             "tool_call_id": tool_call.id
                         })
                         
-                        # Get final response from Groq
-                        final_response = self.client.chat.completions.create(
-                            model=self.model,
-                            messages=messages,
-                            temperature=temperature,
-                            max_completion_tokens=max_tokens,
-                            top_p=top_p,
-                            stream=False
-                        )
-                        
-                        yield final_response.choices[0].message.content
+                        yield tool_response
                         
                     except json.JSONDecodeError as e:
                         log(f"Error parsing tool call arguments: {str(e)}")
