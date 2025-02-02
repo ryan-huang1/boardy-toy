@@ -5,6 +5,7 @@ import requests
 from typing import Generator, Optional
 from datetime import datetime, timezone
 from dotenv import load_dotenv
+import re
 
 # Load environment variables
 load_dotenv()
@@ -81,31 +82,10 @@ You only have 1 task here, and it is to collect the user's background info, then
             Generator: A generator that yields response chunks
         """
         try:
-            # Define available tools
-            tools = [{
-                "type": "function",
-                "function": {
-                    "name": "getSimilarPeople",
-                    "description": "Find similar people based on the user's interests, skills, and background",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "query": {
-                                "type": "string",
-                                "description": "A description of the person including their interests, skills, and background"
-                            }
-                        },
-                        "required": ["query"]
-                    }
-                }
-            }]
-
             log("Making request to Groq API")
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=messages,
-                tools=tools,
-                tool_choice="auto",
                 temperature=temperature,
                 max_completion_tokens=max_tokens,
                 top_p=top_p,
@@ -114,57 +94,52 @@ You only have 1 task here, and it is to collect the user's background info, then
             
             response_content = response.choices[0].message.content
             
-            # If it's a regular response without tool calls, return it directly
-            if not hasattr(response.choices[0].message, 'tool_calls') or not response.choices[0].message.tool_calls:
-                yield response_content
-                return
-                
-            # Handle tool calls
-            tool_call = response.choices[0].message.tool_calls[0]
-            if tool_call.function.name == "getSimilarPeople":
+            # Try to find and parse JSON tool call using regex
+            json_pattern = r'\{[^{}]*"name"\s*:\s*"getSimilarPeople"[^{}]*\}'
+            match = re.search(json_pattern, response_content)
+            
+            if match:
                 try:
-                    # Parse the tool call arguments
-                    args = json.loads(tool_call.function.arguments)
-                    query = args.get('query')
-                    
-                    if not query:
-                        yield "I need more information about you before I can find similar people. Could you tell me more about your interests and skills?"
-                        return
-                        
-                    log(f"Calling similar endpoint with query: {query}")
-                    response = requests.get(
-                        f"{SERVER_URL}/api/person/similar",
-                        params={"query": query}
-                    )
-                    response.raise_for_status()
-                    result = response.json()
-                    
-                    log("Received response from similar endpoint")
-                    
-                    if result.get('success') and result.get('found'):
-                        best_match = result['best_match']
-                        formatted_response = (
-                            f"I found someone you might like to meet! {best_match['name']} is from {best_match['location']} "
-                            f"and is interested in {best_match['interests']}. They're skilled in {best_match['skills']}. "
-                            f"{best_match['bio']}"
+                    tool_call = json.loads(match.group(0))
+                    if tool_call.get('name') == 'getSimilarPeople':
+                        query = tool_call.get('arguments', {}).get('query')
+                            
+                        log(f"Calling similar endpoint with query: {query}")
+                        response = requests.get(
+                            f"{SERVER_URL}/api/person/similar",
+                            params={"query": query}
                         )
-                    else:
-                        formatted_response = "I couldn't find anyone similar at the moment, but we can try again later!"
-                    
-                    yield formatted_response
-                    
-                except json.JSONDecodeError as e:
-                    log(f"Error parsing tool call arguments: {str(e)}")
-                    yield "I encountered an error processing the information. Let's try again!"
+                        response.raise_for_status()
+                        result = response.json()
+                        
+                        log("Received response from similar endpoint")
+                        
+                        if result.get('success') and result.get('found'):
+                            best_match = result['best_match']
+                            formatted_response = (
+                                f"I found someone you might like to meet! {best_match['name']} is from {best_match['location']} "
+                                f"and is interested in {best_match['interests']}. They're skilled in {best_match['skills']}. "
+                                f"{best_match['bio']}"
+                            )
+                        else:
+                            formatted_response = "I couldn't find anyone similar at the moment, but we can try again later!"
+                        
+                        yield formatted_response
+                        return
+                except json.JSONDecodeError:
+                    # If it's not valid JSON, treat it as a regular response
+                    pass
                 except requests.RequestException as e:
                     log(f"Error calling similar endpoint: {str(e)}")
                     yield "I encountered an error while searching for similar people. Let's try again later!"
+                    return
                 except Exception as e:
-                    log(f"Unexpected error in tool call: {str(e)}")
+                    log(f"Unexpected error processing tool call: {str(e)}")
                     yield "Something unexpected happened. Let's try again later!"
-            else:
-                # If it's not a getSimilarPeople tool call, return the original response
-                yield response_content
+                    return
+            
+            # If we get here, it's a regular response
+            yield response_content
                     
         except Exception as e:
             log(f"Error generating response: {str(e)}")
