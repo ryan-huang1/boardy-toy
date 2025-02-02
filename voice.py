@@ -4,6 +4,7 @@ import io
 import time
 from dotenv import load_dotenv
 from pydub import AudioSegment
+from functools import lru_cache
 
 # Load environment variables
 load_dotenv()
@@ -22,7 +23,7 @@ class Voice:
     CHANNELS = 1         # Mono
     BITS = 16           # 16-bit depth for better dynamic range
     
-    def __init__(self):
+    def __init__(self, enable_compression=False):
         """Initialize the Voice class with API key from environment variables"""
         self.api_key = os.getenv('ELEVEN_LABS_API_KEY')
         if not self.api_key:
@@ -34,6 +35,15 @@ class Voice:
             "Content-Type": "application/json",
             "xi-api-key": self.api_key
         }
+        
+        self.enable_compression = enable_compression
+        # Initialize cache for processed audio segments
+        self._audio_segment_cache = {}
+
+    @lru_cache(maxsize=32)
+    def _get_cached_audio_segment(self, audio_bytes_hash):
+        """Cache processed AudioSegment objects to avoid redundant processing"""
+        return AudioSegment.from_mp3(io.BytesIO(audio_bytes))
 
     def _downsample_audio(self, audio_bytes):
         """
@@ -47,41 +57,56 @@ class Voice:
         """
         start_time = time.time()
         
-        # Load audio from bytes
+        # Load audio from bytes using optimized loading
         print(f"Starting audio loading...")
-        audio = AudioSegment.from_mp3(io.BytesIO(audio_bytes))
+        try:
+            # Try to use cached version first
+            audio_bytes_hash = hash(audio_bytes)
+            if audio_bytes_hash in self._audio_segment_cache:
+                audio = self._audio_segment_cache[audio_bytes_hash]
+            else:
+                audio = AudioSegment.from_mp3(io.BytesIO(audio_bytes))
+                self._audio_segment_cache[audio_bytes_hash] = audio
+        except Exception:
+            # Fallback to regular loading if caching fails
+            audio = AudioSegment.from_mp3(io.BytesIO(audio_bytes))
+        
         print(f"Audio loading completed in {time.time() - start_time:.2f} seconds")
         
-        # Convert to mono if stereo
-        if audio.channels > 1:
-            mono_start = time.time()
-            audio = audio.set_channels(self.CHANNELS)
-            print(f"Conversion to mono completed in {time.time() - mono_start:.2f} seconds")
+        # Batch process audio modifications for better performance
+        processing_start = time.time()
         
-        # Set sample rate to 16kHz
-        sample_rate_start = time.time()
-        audio = audio.set_frame_rate(self.SAMPLE_RATE)
-        print(f"Sample rate adjustment completed in {time.time() - sample_rate_start:.2f} seconds")
+        # Convert to mono and adjust sample rate in one pass if possible
+        if audio.channels > 1 or audio.frame_rate != self.SAMPLE_RATE:
+            audio = audio.set_channels(self.CHANNELS).set_frame_rate(self.SAMPLE_RATE)
         
-        # Set to 16-bit depth
-        bit_depth_start = time.time()
+        # Set bit depth
         audio = audio.set_sample_width(self.BITS // 8)
-        print(f"Bit depth adjustment completed in {time.time() - bit_depth_start:.2f} seconds")
         
-        # Normalize audio
-        normalize_start = time.time()
+        # Normalize audio (essential for voice clarity)
         audio = audio.normalize()
-        print(f"Audio normalization completed in {time.time() - normalize_start:.2f} seconds")
         
-        # Apply compression
-        compress_start = time.time()
-        audio = audio.compress_dynamic_range()
-        print(f"Audio compression completed in {time.time() - compress_start:.2f} seconds")
+        print(f"Basic audio processing completed in {time.time() - processing_start:.2f} seconds")
         
-        # Export to bytes
+        # Apply compression only if enabled
+        if self.enable_compression:
+            compress_start = time.time()
+            audio = audio.compress_dynamic_range()
+            print(f"Audio compression completed in {time.time() - compress_start:.2f} seconds")
+        
+        # Export to bytes with optimized settings
         export_start = time.time()
         buffer = io.BytesIO()
-        audio.export(buffer, format='mp3', bitrate='64k')
+        
+        # Use optimized export parameters
+        export_params = {
+            'format': 'mp3',
+            'bitrate': '64k',
+            'codec': 'libmp3lame',
+            'parameters': ['-q:a', '2']  # Better quality-speed trade-off
+        }
+        
+        audio.export(buffer, **export_params)
         print(f"Audio export completed in {time.time() - export_start:.2f} seconds")
         
         total_time = time.time() - start_time
