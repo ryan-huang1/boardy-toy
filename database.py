@@ -61,7 +61,7 @@ class MongoDB:
         """Update conversation history with new messages"""
         try:
             # Get current timestamp
-            timestamp = datetime.utcnow()
+            timestamp = datetime.utcnow().isoformat()
             
             # Create update operations
             update_ops = []
@@ -82,12 +82,13 @@ class MongoDB:
                 
             if update_ops:
                 # Update or create conversation document
+                current_time = datetime.utcnow().isoformat()
                 self._db.conversations.update_one(
                     {'call_uuid': call_uuid},
                     {
                         '$push': {'messages': {'$each': update_ops}},
-                        '$setOnInsert': {'created_at': timestamp},
-                        '$set': {'updated_at': timestamp}
+                        '$setOnInsert': {'created_at': current_time},
+                        '$set': {'updated_at': current_time}
                     },
                     upsert=True
                 )
