@@ -1,6 +1,7 @@
 import os
 import requests
 import io
+import time
 from dotenv import load_dotenv
 from pydub import AudioSegment
 
@@ -44,28 +45,48 @@ class Voice:
         Returns:
             bytes: Processed audio in bytes
         """
+        start_time = time.time()
+        
         # Load audio from bytes
+        print(f"Starting audio loading...")
         audio = AudioSegment.from_mp3(io.BytesIO(audio_bytes))
+        print(f"Audio loading completed in {time.time() - start_time:.2f} seconds")
         
         # Convert to mono if stereo
         if audio.channels > 1:
+            mono_start = time.time()
             audio = audio.set_channels(self.CHANNELS)
+            print(f"Conversion to mono completed in {time.time() - mono_start:.2f} seconds")
         
         # Set sample rate to 16kHz
+        sample_rate_start = time.time()
         audio = audio.set_frame_rate(self.SAMPLE_RATE)
+        print(f"Sample rate adjustment completed in {time.time() - sample_rate_start:.2f} seconds")
         
         # Set to 16-bit depth
+        bit_depth_start = time.time()
         audio = audio.set_sample_width(self.BITS // 8)
+        print(f"Bit depth adjustment completed in {time.time() - bit_depth_start:.2f} seconds")
         
-        # Normalize audio to maximize volume while preventing clipping
+        # Normalize audio
+        normalize_start = time.time()
         audio = audio.normalize()
+        print(f"Audio normalization completed in {time.time() - normalize_start:.2f} seconds")
         
-        # Apply mild compression to enhance clarity
+        # Apply compression
+        compress_start = time.time()
         audio = audio.compress_dynamic_range()
+        print(f"Audio compression completed in {time.time() - compress_start:.2f} seconds")
         
-        # Export to bytes with a higher bitrate for better quality
+        # Export to bytes
+        export_start = time.time()
         buffer = io.BytesIO()
         audio.export(buffer, format='mp3', bitrate='64k')
+        print(f"Audio export completed in {time.time() - export_start:.2f} seconds")
+        
+        total_time = time.time() - start_time
+        print(f"Total audio processing time: {total_time:.2f} seconds")
+        
         return buffer.getvalue()
 
     def generate_speech(self, text, voice_id="pqHfZKP75CvOlQylNhV4", output_path=None):
@@ -81,6 +102,8 @@ class Voice:
             bytes or str: If output_path is None, returns the downsampled audio bytes.
                          If output_path is provided, returns the path to the saved file.
         """
+        start_time = time.time()
+        
         try:
             # API endpoint for text-to-speech
             url = f"{self.BASE_URL}/text-to-speech/{voice_id}"
@@ -98,27 +121,39 @@ class Voice:
             }
             
             # Make the API request
+            print(f"Starting API request to ElevenLabs...")
+            api_start = time.time()
             response = requests.post(url, json=data, headers=self.headers)
-            
-            # Check if request was successful
             response.raise_for_status()
+            print(f"API request completed in {time.time() - api_start:.2f} seconds")
             
             # Get audio content
             audio_content = response.content
             
             # Downsample the audio
+            print("Starting audio downsampling...")
+            downsample_start = time.time()
             downsampled_audio = self._downsample_audio(audio_content)
+            print(f"Audio downsampling completed in {time.time() - downsample_start:.2f} seconds")
             
-            # If output path is provided, save the downsampled audio file
+            # Save if output path provided
             if output_path:
+                save_start = time.time()
                 with open(output_path, 'wb') as f:
                     f.write(downsampled_audio)
-                return output_path
+                print(f"File saving completed in {time.time() - save_start:.2f} seconds")
+                result = output_path
+            else:
+                result = downsampled_audio
             
-            # Otherwise return the downsampled audio bytes
-            return downsampled_audio
+            total_time = time.time() - start_time
+            print(f"Total speech generation time: {total_time:.2f} seconds")
+            
+            return result
             
         except requests.exceptions.RequestException as e:
+            print(f"API request failed after {time.time() - start_time:.2f} seconds")
             raise Exception(f"Error generating speech: {str(e)}")
         except Exception as e:
+            print(f"Processing failed after {time.time() - start_time:.2f} seconds")
             raise Exception(f"Error processing audio: {str(e)}") 
