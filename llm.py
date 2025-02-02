@@ -12,7 +12,7 @@ class LLMGeneration:
         self.client = Groq(
             api_key=os.getenv('GROQ_API_KEY')
         )
-        self.model = "llama-3.1-8b-instant	"
+        self.model = "llama-3.1-8b-instant"
         
     def get_system_prompt(self) -> str:
         """Return the system prompt for Boardy."""
