@@ -3,6 +3,7 @@ import json
 import os
 from vonage import Vonage, Auth
 from dotenv import load_dotenv
+from datetime import datetime
 
 # Load environment variables
 load_dotenv()
@@ -32,12 +33,15 @@ client = Vonage(
 @vonage_bp.route('/intro-audio')
 def serve_intro_audio():
     """Serve the intro.mp3 file"""
+    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Serving intro audio file from {BASE_DIR}")
     return send_from_directory(BASE_DIR, 'intro.mp3')
 
 @vonage_bp.route('/webhooks/inbound', methods=['GET'])
 def handle_inbound_call():
     """Handle inbound calls from Vonage"""
-    print("Received inbound call")
+    call_uuid = request.args.get('uuid', 'No UUID provided')
+    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Received inbound call - UUID: {call_uuid}")
+    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Call parameters: {request.args}")
     
     # Create NCCO with both stream and input actions
     ncco = [{
@@ -56,46 +60,82 @@ def handle_inbound_call():
         }
     }]
     
+    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Returning NCCO for call {call_uuid}")
+    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] NCCO content: {json.dumps(ncco, indent=2)}")
     return Response(json.dumps(ncco), mimetype='application/json')
 
 @vonage_bp.route('/webhooks/input', methods=['POST'])
 def handle_input():
     """Handle speech input from the call"""
-    print("Input received:", request.json)
-    return "OK", 200
+    try:
+        input_data = request.json
+        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Speech input received")
+        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Input data: {json.dumps(input_data, indent=2)}")
+        
+        # Print specific speech results if available
+        if input_data.get('speech') and input_data['speech'].get('results'):
+            for result in input_data['speech']['results']:
+                print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Speech text: {result.get('text', 'No text')} - Confidence: {result.get('confidence', 'N/A')}")
+        
+        return "OK", 200
+    except Exception as e:
+        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] ERROR: Error processing speech input: {str(e)}")
+        return "Error", 500
 
 @vonage_bp.route('/webhooks/event', methods=['POST'])
 def handle_event():
     """Handle Vonage events"""
-    print("Event received:", request.json)
-    return "OK", 200
+    try:
+        event_data = request.json
+        event_type = event_data.get('type', 'unknown')
+        call_uuid = event_data.get('uuid', 'No UUID')
+        
+        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Received event type: {event_type} for call: {call_uuid}")
+        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Full event data: {json.dumps(event_data, indent=2)}")
+        
+        return "OK", 200
+    except Exception as e:
+        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] ERROR: Error processing event: {str(e)}")
+        return "Error", 500
 
 @vonage_bp.route('/make-call', methods=['GET'])
 def make_call():
     """Make an outbound call"""
-    if not request.args.get('to_number'):
+    to_number = request.args.get('to_number')
+    
+    if not to_number:
+        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] WARNING: Attempted to make call without providing to_number")
         return jsonify({
             'error': 'Missing to_number parameter'
         }), 400
+    
+    try:
+        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Initiating outbound call to: {to_number}")
         
-    to_number = request.args.get('to_number')
-    
-    response = client.voice.create_call({
-        'to': [{
-            'type': 'phone',
-            'number': to_number
-        }],
-        'from': {
-            'type': 'phone',
-            'number': VONAGE_NUMBER
-        },
-        'answer_url': [f"{SERVER_URL}/api/vonage/webhooks/inbound"]
-    })
-    
-    uuid = response['uuid']
-    print(f"Call initiated with UUID: {uuid}")
-    return jsonify({
-        'success': True,
-        'uuid': uuid,
-        'message': 'Call initiated successfully'
-    }) 
+        response = client.voice.create_call({
+            'to': [{
+                'type': 'phone',
+                'number': to_number
+            }],
+            'from': {
+                'type': 'phone',
+                'number': VONAGE_NUMBER
+            },
+            'answer_url': [f"{SERVER_URL}/api/vonage/webhooks/inbound"]
+        })
+        
+        uuid = response['uuid']
+        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Call successfully initiated - UUID: {uuid}")
+        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Full response: {json.dumps(response, indent=2)}")
+        
+        return jsonify({
+            'success': True,
+            'uuid': uuid,
+            'message': 'Call initiated successfully'
+        })
+    except Exception as e:
+        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] ERROR: Error initiating call to {to_number}: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500 
