@@ -23,14 +23,14 @@ SERVER_URL = "https://dolphin-app-bsmq7.ondigitalocean.app"
 
 # Environment Variables for Vonage
 VONAGE_APPLICATION_ID = os.getenv('VONAGE_APPLICATION_ID')
-API_KEY_PATH = os.getenv('API_KEY_PATH')
+VONAGE_PRIVATE_KEY = os.getenv('VONAGE_PRIVATE_KEY')
 VONAGE_NUMBER = os.getenv('VONAGE_NUMBER')
 
 # Vonage Client Setup
 client = Vonage(
     auth=Auth(
         application_id=VONAGE_APPLICATION_ID,
-        private_key=API_KEY_PATH,
+        private_key=VONAGE_PRIVATE_KEY,
     )
 )
 
