@@ -136,6 +136,26 @@ def list_persons():
             # Add embedding preview if available
             if embedding_preview is not None:
                 person['embeddingPreview'] = embedding_preview
+                
+            # Get conversation history for this person
+            conversations = list(db.conversations.find(
+                {'call_uuid': {'$regex': person['phoneNumber']}},
+                {'_id': 0, 'messages': 1}
+            ))
+            
+            # Add conversation histories to person object
+            person['conversations'] = []
+            for conv in conversations:
+                if 'messages' in conv:
+                    # Format each message for display
+                    formatted_messages = []
+                    for msg in conv['messages']:
+                        formatted_messages.append({
+                            'role': msg['role'],
+                            'content': msg['content'],
+                            'timestamp': msg.get('timestamp', '')
+                        })
+                    person['conversations'].append(formatted_messages)
             
             persons.append(person)
             
@@ -460,6 +480,30 @@ def find_similar_people():
                 'bio': best_match['bio'],
                 'location': best_match['location'],
                 'match_score': round(best_match['similarity'] * 100, 1)  # Convert to percentage
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'code': 500
+        }), 500
+
+@person_bp.route('/delete-conversations', methods=['DELETE'])
+def delete_all_conversations():
+    try:
+        # Get database instance
+        db = MongoDB().get_db()
+        
+        # Delete all documents from conversations collection
+        result = db.conversations.delete_many({})
+        
+        return jsonify({
+            'success': True,
+            'message': f'Successfully deleted {result.deleted_count} conversations',
+            'data': {
+                'deleted_count': result.deleted_count
             }
         })
         
