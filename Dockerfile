@@ -13,6 +13,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
+    ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 # Install CPU-only PyTorch and torchvision first
