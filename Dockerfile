@@ -40,4 +40,4 @@ USER appuser
 EXPOSE 8080
 
 # Command to run the application
-CMD gunicorn --bind 0.0.0.0:$PORT app:app --workers 4 --threads 2 --timeout 120 
+CMD gunicorn --bind 0.0.0.0:$PORT app:app --workers 2 --threads 2 --timeout 120 
