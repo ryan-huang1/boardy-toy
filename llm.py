@@ -1,10 +1,14 @@
 from groq import Groq
 import os
+import requests
 from typing import Generator, Optional
 from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
+
+# Server URL for API calls
+SERVER_URL = "https://dolphin-app-bsmq7.ondigitalocean.app"
 
 class LLMGeneration:
     def __init__(self):
@@ -12,7 +16,7 @@ class LLMGeneration:
         self.client = Groq(
             api_key=os.getenv('GROQ_API_KEY')
         )
-        self.model = "llama-3.1-8b-instant"
+        self.model = "llama-3.1-8b-instant"  # Using tool-use model
         
     def get_system_prompt(self) -> str:
         """Return the system prompt for Boardy."""
@@ -31,7 +35,7 @@ After that there is some more info which you will need to collect. This should n
 - Skills "what they're good at" (examples: color theory, web dev, food safety)
 - A bio about themselves (examples: Experienced chef specializing in Food Safety, Kitchen Management, Experienced artist specializing in Art History, Exhibition Design, Experienced nurse specializing in Healthcare Technology, Emergency Response)
 
-Once you have all the information about the user, use the getSimilarPeople tool to find people similar to the person you're talking to. You can say something like "Awesome it was nice to learn about you, I have a person in mind you might want to meet! Give me a quick second.".
+Once you have all the information about the user, use the getSimilarPeople tool to find people similar to the person you're talking to. 
 
 You only have 1 task here, and it is to collect the user's background info, then use the tool to recommend similar people.
 
@@ -57,9 +61,30 @@ You only have 1 task here, and it is to collect the user's background info, then
             Generator: A generator that yields response chunks
         """
         try:
+            # Define available tools
+            tools = [{
+                "type": "function",
+                "function": {
+                    "name": "getSimilarPeople",
+                    "description": "Find similar people based on the user's interests, skills, and background",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "query": {
+                                "type": "string",
+                                "description": "A description of the person including their interests, skills, and background"
+                            }
+                        },
+                        "required": ["query"]
+                    }
+                }
+            }]
+
             completion = self.client.chat.completions.create(
                 model=self.model,
                 messages=messages,
+                tools=tools,
+                tool_choice="auto",
                 temperature=temperature,
                 max_completion_tokens=max_tokens,
                 top_p=top_p,
@@ -70,6 +95,31 @@ You only have 1 task here, and it is to collect the user's background info, then
             for chunk in completion:
                 if chunk.choices[0].delta.content is not None:
                     yield chunk.choices[0].delta.content
+                elif hasattr(chunk.choices[0].delta, 'tool_calls') and chunk.choices[0].delta.tool_calls:
+                    tool_call = chunk.choices[0].delta.tool_calls[0]
+                    if tool_call.function.name == "getSimilarPeople":
+                        # Call the similar people endpoint
+                        try:
+                            response = requests.get(
+                                f"{SERVER_URL}/api/person/similar",
+                                params={"query": tool_call.function.arguments.get("query")}
+                            )
+                            response.raise_for_status()
+                            result = response.json()
+                            
+                            if result.get('found'):
+                                best_match = result['best_match']
+                                match_text = (
+                                    f"Awesome it was nice to learn about you, I have a person in mind you might want to meet! {best_match['name']} is from {best_match['location']} "
+                                    f"and is interested in {best_match['interests']}. They're skilled in {best_match['skills']}. "
+                                    f"{best_match['bio']}"
+                                )
+                                yield match_text
+                            else:
+                                yield "I couldn't find anyone similar at the moment, but we can try again later!"
+                        except Exception as e:
+                            print(f"Error calling similar people endpoint: {str(e)}")
+                            yield "I encountered an error while searching for similar people. Let's try again on another call later!"
                     
         except Exception as e:
             print(f"Error generating response: {str(e)}")
@@ -93,4 +143,4 @@ You only have 1 task here, and it is to collect the user's background info, then
             }
         ]
         
-        return self.generate_response(messages) 
+        return self.generate_response(messages)
