@@ -52,7 +52,13 @@ class MongoDB:
         """Get conversation history for a specific call"""
         try:
             conversation = self._db.conversations.find_one({'call_uuid': call_uuid})
-            return conversation['messages'] if conversation else []
+            if conversation and 'messages' in conversation:
+                # Filter out timestamp field from each message
+                return [{
+                    'role': msg['role'],
+                    'content': msg['content']
+                } for msg in conversation['messages']]
+            return []
         except Exception as e:
             print(f"Error getting conversation history: {e}")
             return []

@@ -70,6 +70,11 @@ def handle_inbound_call():
     print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Received inbound call - UUID: {call_uuid}")
     print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Call parameters: {request.args}")
     
+    # Store initial greeting in MongoDB
+    initial_greeting = "Hey I'm Boardy, it's nice to meet you. Who am I speaking with?"
+    db = MongoDB()
+    db.update_conversation(call_uuid, assistant_message=initial_greeting)
+    
     # Create NCCO with both stream and input actions
     ncco = [{
         'action': 'stream',
@@ -80,7 +85,7 @@ def handle_inbound_call():
         'eventUrl': [f"{SERVER_URL}/api/vonage/webhooks/input"],
         'type': ['speech'],
         'speech': {
-            'uuid': [request.args.get('uuid')],
+            'uuid': [call_uuid],
             'endOnSilence': 1,
             'sensitivity': '10',
             'language': 'en-US'
@@ -114,16 +119,10 @@ def handle_input():
         db = MongoDB()
         conversation_history = db.get_conversation_history(call_uuid)
         
-        # If this is the first message, include the initial greeting
+        # Build messages list with system prompt and conversation history
         messages = [
             {"role": "system", "content": llm_generator.get_system_prompt()},
         ]
-        
-        if not conversation_history:
-            initial_greeting = "Hey I'm Boardy, it's nice to meet you. Who am I speaking with?"
-            messages.append({"role": "assistant", "content": initial_greeting})
-            # Store initial greeting in conversation history
-            db.update_conversation(call_uuid, assistant_message=initial_greeting)
         
         # Add conversation history
         messages.extend(conversation_history)
