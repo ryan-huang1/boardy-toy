@@ -88,7 +88,7 @@ class Voice:
             # Request payload with optimized voice settings
             data = {
                 "text": text,
-                "model_id": "eleven_turbo_v2_5",  # Using Turbo v2.5 model
+                "model_id": "eleven_flash_v2_5",  # Using Turbo v2.5 model
                 "voice_settings": {
                     "stability": 0.3,         # Lowered for more expressive output
                     "similarity_boost": 0.8,   # Increased for better voice matching
