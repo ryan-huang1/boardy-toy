@@ -23,7 +23,7 @@ class LLMGeneration:
         self.client = Groq(
             api_key=os.getenv('GROQ_API_KEY')
         )
-        self.model = "llama-3.1-8b-instant"  # Using tool-use model
+        self.model = "llama-3.1-8b-instant"
         log(f"Initialized LLM with model: {self.model}")
 
     def get_system_prompt(self) -> str:
@@ -88,8 +88,8 @@ You only have 1 task here, and it is to collect the user's background info, then
                 }
             }]
 
-            log("Generating LLM response...")
-            completion = self.client.chat.completions.create(
+            log("Making request to Groq API")
+            response = self.client.chat.completions.create(
                 model=self.model,
                 messages=messages,
                 tools=tools,
@@ -97,58 +97,80 @@ You only have 1 task here, and it is to collect the user's background info, then
                 temperature=temperature,
                 max_completion_tokens=max_tokens,
                 top_p=top_p,
-                stream=True,
-                stop=None
+                stream=False
             )
             
-            for chunk in completion:
-                if chunk.choices[0].delta.content is not None:
-                    yield chunk.choices[0].delta.content
-                elif hasattr(chunk.choices[0].delta, 'tool_calls') and chunk.choices[0].delta.tool_calls:
-                    tool_call = chunk.choices[0].delta.tool_calls[0]
-                    if tool_call.function.name == "getSimilarPeople":
-                        log("Processing getSimilarPeople tool call...")
-                        try:
-                            # Parse the arguments as JSON
-                            args = json.loads(tool_call.function.arguments)
-                            query = args.get('query')
+            # Check for tool calls
+            if hasattr(response.choices[0].message, 'tool_calls') and response.choices[0].message.tool_calls:
+                tool_call = response.choices[0].message.tool_calls[0]
+                if tool_call.function.name == "getSimilarPeople":
+                    log("Processing getSimilarPeople tool call")
+                    try:
+                        # Parse the arguments as JSON
+                        args = json.loads(tool_call.function.arguments)
+                        query = args.get('query')
+                        
+                        if not query:
+                            yield "I need more information about you before I can find similar people. Could you tell me more about your interests and skills?"
+                            return
                             
-                            if not query:
-                                log("Error: No query provided in tool call arguments")
-                                yield "I need more information about you before I can find similar people. Could you tell me more about your interests and skills?"
-                                continue
-                                
-                            log(f"Calling similar people endpoint with query: {query}")
-                            response = requests.get(
-                                f"{SERVER_URL}/api/person/similar",
-                                params={"query": query}
+                        log(f"Calling similar endpoint with query: {query}")
+                        response = requests.get(
+                            f"{SERVER_URL}/api/person/similar",
+                            params={"query": query}
+                        )
+                        response.raise_for_status()
+                        result = response.json()
+                        
+                        log("Received response from similar endpoint")
+                        
+                        # Add tool call and response to messages
+                        messages.append({
+                            "role": "assistant",
+                            "content": None,
+                            "tool_calls": [tool_call]
+                        })
+                        
+                        if result.get('success') and result.get('found'):
+                            best_match = result['best_match']
+                            tool_response = (
+                                f"I thought of someone you might like to meet! {best_match['name']} is from {best_match['location']} "
+                                f"and is interested in {best_match['interests']}. They're skilled in {best_match['skills']}. "
+                                f"{best_match['bio']}"
                             )
-                            response.raise_for_status()
-                            result = response.json()
+                        else:
+                            tool_response = "I couldn't find anyone similar at the moment, but we can try again later!"
                             
-                            log(f"Similar people endpoint response: {json.dumps(result, indent=2)}")
-                            
-                            if result.get('success') and result.get('found'):
-                                best_match = result['best_match']
-                                match_text = (
-                                    f"Awesome it was nice to learn about you, I have a person in mind you might want to meet! {best_match['name']} is from {best_match['location']} "
-                                    f"and is interested in {best_match['interests']}. They're skilled in {best_match['skills']}. "
-                                    f"{best_match['bio']}"
-                                )
-                                log("Found a match, returning response")
-                                yield match_text
-                            else:
-                                log("No matches found")
-                                yield "I couldn't find anyone similar at the moment, but we can try again later!"
-                        except json.JSONDecodeError as e:
-                            log(f"Error parsing tool call arguments: {str(e)}")
-                            yield "I encountered an error processing your information. Let's try again!"
-                        except requests.RequestException as e:
-                            log(f"Error calling similar people endpoint: {str(e)}")
-                            yield "I encountered an error while searching for similar people. Let's try again on another call later!"
-                        except Exception as e:
-                            log(f"Unexpected error in tool call: {str(e)}")
-                            yield "Something unexpected happened. Let's try again later!"
+                        messages.append({
+                            "role": "tool",
+                            "content": tool_response,
+                            "tool_call_id": tool_call.id
+                        })
+                        
+                        # Get final response from Groq
+                        final_response = self.client.chat.completions.create(
+                            model=self.model,
+                            messages=messages,
+                            temperature=temperature,
+                            max_completion_tokens=max_tokens,
+                            top_p=top_p,
+                            stream=False
+                        )
+                        
+                        yield final_response.choices[0].message.content
+                        
+                    except json.JSONDecodeError as e:
+                        log(f"Error parsing tool call arguments: {str(e)}")
+                        yield "I encountered an error processing your information. Let's try again!"
+                    except requests.RequestException as e:
+                        log(f"Error calling similar endpoint: {str(e)}")
+                        yield "I encountered an error while searching for similar people. Let's try again later!"
+                    except Exception as e:
+                        log(f"Unexpected error in tool call: {str(e)}")
+                        yield "Something unexpected happened. Let's try again later!"
+            else:
+                # Regular response without tool calls
+                yield response.choices[0].message.content
                     
         except Exception as e:
             log(f"Error generating response: {str(e)}")

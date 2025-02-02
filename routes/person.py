@@ -140,7 +140,7 @@ def list_persons():
                 
             # Get conversation history for this person
             conversations = list(db.conversations.find(
-                {'call_uuid': {'$regex': person['phoneNumber']}},
+                {'call_uuid': {'$regex': re.escape(person['phoneNumber'])}},
                 {'_id': 0, 'messages': 1}
             ))
             
@@ -516,6 +516,77 @@ def delete_all_conversations():
             'message': f'Successfully deleted {result.deleted_count} conversations',
             'data': {
                 'deleted_count': result.deleted_count
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'code': 500
+        }), 500
+
+@person_bp.route('/conversations', methods=['GET'])
+def get_conversations():
+    try:
+        # Get database instance
+        db = MongoDB().get_db()
+        
+        # Get phone number from query parameters (optional)
+        phone_number = request.args.get('phone_number')
+        
+        # Get pagination parameters from query string
+        page = int(request.args.get('page', 1))
+        per_page = int(request.args.get('per_page', 100))
+        
+        # Validate pagination parameters
+        if page < 1:
+            page = 1
+        if per_page < 1 or per_page > 100:
+            per_page = 100
+            
+        # Calculate skip value for pagination
+        skip = (page - 1) * per_page
+        
+        # Build query based on whether phone number is provided
+        query = {}
+        if phone_number:
+            query['call_uuid'] = {'$regex': re.escape(phone_number)}
+            
+        # Get total count of matching conversations
+        total_count = db.conversations.count_documents(query)
+        
+        # Get paginated results
+        cursor = db.conversations.find(
+            query,
+            {'_id': 0}  # Exclude _id field from results
+        ).skip(skip).limit(per_page).sort('updated_at', -1)  # Sort by most recent first
+        
+        # Convert cursor to list and process conversations
+        conversations = []
+        for conv in cursor:
+            # Format messages for display
+            if 'messages' in conv:
+                formatted_messages = []
+                for msg in conv['messages']:
+                    formatted_messages.append({
+                        'role': msg['role'],
+                        'content': msg['content'],
+                        'timestamp': msg.get('timestamp', '')
+                    })
+                conv['messages'] = formatted_messages
+            conversations.append(conv)
+            
+        return jsonify({
+            'success': True,
+            'data': {
+                'conversations': conversations,
+                'pagination': {
+                    'total_count': total_count,
+                    'page': page,
+                    'per_page': per_page,
+                    'total_pages': (total_count + per_page - 1) // per_page
+                }
             }
         })
         
